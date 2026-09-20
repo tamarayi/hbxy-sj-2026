@@ -634,6 +634,7 @@
 
     function renderCalib() {
       list.innerHTML = '';
+      var out = ['# ' + teams[teamIndex].name + ' 校准后的坐标', ''];
       places.forEach(function (p, i) {
         var c = markers[i].getLatLng();
         var row = document.createElement('div');
@@ -641,7 +642,11 @@
         row.innerHTML = '<div class="cr-name">' + (i + 1) + '. ' + esc(p.name) + '</div>' +
           '<div class="cr-coord">[' + c.lat.toFixed(4) + ', ' + c.lng.toFixed(4) + ']</div>';
         list.appendChild(row);
+        out.push(p.name + '  [' + c.lat.toFixed(4) + ', ' + c.lng.toFixed(4) + ']');
       });
+      var ta = document.getElementById('calibOut');
+      if (ta) ta.value = out.join('\n');   // 实时更新，可直接框选复制
+      return out.join('\n');
     }
   }
 
@@ -650,23 +655,23 @@
       var copyBtn = document.getElementById('calibCopy');
       var closeBtn = document.getElementById('calibClose');
       if (copyBtn) copyBtn.addEventListener('click', function () {
-        var lines = ['# ' + teams[teamIndex].name + ' 校准后的坐标'];
-        places.forEach(function (p, i) {
-          var c = markers[i].getLatLng();
-          lines.push(p.name + '  [' + c.lat.toFixed(4) + ', ' + c.lng.toFixed(4) + ']');
-        });
-        var txt = lines.join('\n');
-        var ta = document.createElement('textarea');
-        ta.value = txt;
-        ta.style.cssText = 'position:fixed;left:-9999px';
-        document.body.appendChild(ta); ta.select();
+        var ta = document.getElementById('calibOut');
+        if (!ta) return;
+        ta.removeAttribute('readonly');
+        ta.focus();
+        ta.select();
+        ta.setSelectionRange(0, 99999);
         var ok = false;
         try { ok = document.execCommand('copy'); } catch (e) {}
-        document.body.removeChild(ta);
-        console.log(txt);
-        this.textContent = ok ? '✓ 已复制，发给我' : '已输出到控制台(F12)';
+        if (!ok && navigator.clipboard) {
+          navigator.clipboard.writeText(ta.value).then(function () {}, function () {});
+          ok = true;
+        }
+        ta.setAttribute('readonly', 'readonly');
+        console.log(ta.value);
+        this.textContent = ok ? '✓ 已复制' : '请在上框手动 Ctrl+A / Ctrl+C';
         var b = this;
-        setTimeout(function () { b.textContent = '复制全部坐标'; }, 2400);
+        setTimeout(function () { b.textContent = '一键复制'; }, 2400);
       });
       if (closeBtn) closeBtn.addEventListener('click', function () {
         location.href = location.pathname;

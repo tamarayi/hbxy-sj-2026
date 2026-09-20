@@ -69,8 +69,12 @@
     </div>
     <div class="calib-list" id="calibList"></div>
     <div class="calib-foot">
-      <button id="calibCopy" type="button">复制全部坐标</button>
-      <button id="calibClose" type="button" class="ghost">退出</button>
+      <div class="calib-out-tip">① 点下面的框 ② 按 Ctrl+A ③ 按 Ctrl+C ④ 发给我</div>
+      <textarea id="calibOut" readonly spellcheck="false"></textarea>
+      <div class="calib-btns">
+        <button id="calibCopy" type="button">一键复制</button>
+        <button id="calibClose" type="button" class="ghost">退出</button>
+      </div>
     </div>
   </div>
 
