@@ -461,8 +461,26 @@
   var callout = document.getElementById('routeCallout');
   var playBtn = document.getElementById('playBtn');
   var SEG_SECONDS = 3.0;   // 每段行进时长（秒）——录视频时想快就调小
-  var STOP_HOLD = 3.2;     // 到站停留时长（秒）
+  var STOP_HOLD = 4.2;     // 到站停留时长（秒，含放大动画）
+  var ZOOM_LEVEL = 13;     // 到站后放大到几级
+  var ZOOM_SECONDS = 0.9;  // 放大/缩小时长
   var anim = { playing: false, seg: 0, t: 0, holdUntil: 0, lastTs: 0, raf: null, visited: -1 };
+  var routeBounds = null;  // 全程范围，用于缩回全览
+
+  function zoomToPlace(i) {
+    var p = places[i];
+    if (!p) return;
+    map.flyTo(p.coords, ZOOM_LEVEL, { duration: ZOOM_SECONDS, easeLinearity: 0.28 });
+  }
+
+  function zoomToRoute() {
+    if (!routeBounds) return;
+    map.flyToBounds(routeBounds, {
+      duration: ZOOM_SECONDS,
+      paddingTopLeft: [70, 175],
+      paddingBottomRight: [70, 155]
+    });
+  }
 
   function busIcon() {
     return L.divIcon({
@@ -530,6 +548,7 @@
     if (anim.holdUntil) {
       if (ts < anim.holdUntil) { anim.raf = requestAnimationFrame(tick); return; }
       anim.holdUntil = 0;
+      zoomToRoute();          // 停留结束，缩回全程视角
     }
 
     var a = places[anim.seg], b = places[anim.seg + 1];
@@ -549,6 +568,7 @@
         setMarkerActive(arrive - 1, false);
         setMarkerActive(arrive, true);
         showCallout(arrive);
+        zoomToPlace(arrive);        // 到站：自动放大到该地点
       }
       anim.holdUntil = ts + STOP_HOLD * 1000;
       anim.seg++;
@@ -562,7 +582,8 @@
     if (busMarker) { map.removeLayer(busMarker); busMarker = null; }
     anim.seg = 0; anim.t = 0; anim.visited = -1; anim.holdUntil = 0; anim.lastTs = 0;
     anim.playing = true;
-    map.fitBounds(L.latLngBounds(places.map(function (p) { return p.coords; })), {
+    routeBounds = L.latLngBounds(places.map(function (p) { return p.coords; }));
+    map.fitBounds(routeBounds, {
       paddingTopLeft: [70, 175], paddingBottomRight: [70, 155]
     });
     setBusPos(places[0].coords);
