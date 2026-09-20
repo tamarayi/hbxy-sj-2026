@@ -16,7 +16,19 @@
     <h1 id="siteTitle">三下乡路线图</h1>
     <p id="siteSubtitle"></p>
     <nav class="teams" id="teams"></nav>
+    <button class="play-btn" id="playBtn" type="button">
+      <span class="pb-icon">▶</span><span class="pb-text">播放行程</span>
+    </button>
   </header>
+
+  <!-- 大巴车行进时的地点提示卡 -->
+  <div class="route-callout" id="routeCallout">
+    <span class="rc-num" id="rcNum">1</span>
+    <div class="rc-text">
+      <strong id="rcName"></strong>
+      <span id="rcDesc"></span>
+    </div>
+  </div>
 
   <!-- 数据出错时的提示条 -->
   <div class="errbar" id="errbar"></div>

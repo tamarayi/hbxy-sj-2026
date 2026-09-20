@@ -447,6 +447,7 @@
   /* ========================= 切换队伍 ========================= */
   function switchTeam(i) {
     if (i === teamIndex) return;
+    stopBus(true);          // 切换队伍时中断大巴车动画
     closePanel();
     teamIndex = i;
     paintTabs();
@@ -454,6 +455,133 @@
     // 切换后把地图收回全览
     window.scrollTo(0, 0);
   }
+
+  /* ========================= 大巴车行程动画 ========================= */
+  var busMarker = null;
+  var callout = document.getElementById('routeCallout');
+  var playBtn = document.getElementById('playBtn');
+  var SEG_SECONDS = 3.0;   // 每段行进时长（秒）——录视频时想快就调小
+  var STOP_HOLD = 3.2;     // 到站停留时长（秒）
+  var anim = { playing: false, seg: 0, t: 0, holdUntil: 0, lastTs: 0, raf: null, visited: -1 };
+
+  function busIcon() {
+    return L.divIcon({
+      className: 'bus-icon',
+      html: '<div class="bus-body">🚌</div>',
+      iconSize: [42, 42],
+      iconAnchor: [21, 21]
+    });
+  }
+
+  function setBusPos(coords) {
+    if (!busMarker) {
+      busMarker = L.marker(coords, { icon: busIcon(), interactive: false, zIndexOffset: 1200 }).addTo(map);
+    } else {
+      busMarker.setLatLng(coords);
+    }
+  }
+
+  function showCallout(i) {
+    var p = places[i];
+    if (!p) return;
+    document.getElementById('rcNum').textContent = i + 1;
+    document.getElementById('rcName').textContent = p.name;
+    document.getElementById('rcDesc').textContent = p.summary || p.short || '';
+    callout.classList.add('is-show');
+  }
+
+  function setPlayLabel(icon, text, playing) {
+    playBtn.querySelector('.pb-icon').textContent = icon;
+    playBtn.querySelector('.pb-text').textContent = text;
+    playBtn.classList.toggle('is-playing', !!playing);
+  }
+
+  function stopBus(reset) {
+    anim.playing = false;
+    if (anim.raf) cancelAnimationFrame(anim.raf);
+    anim.raf = null;
+    anim.lastTs = 0;
+    if (reset) {
+      if (busMarker) { map.removeLayer(busMarker); busMarker = null; }
+      callout.classList.remove('is-show');
+      setMarkerActive(current, false);
+      setMarkerActive(anim.visited, false);
+      anim.seg = 0; anim.t = 0; anim.visited = -1; anim.holdUntil = 0;
+      setPlayLabel('▶', '播放行程', false);
+    } else {
+      setPlayLabel('▶', '继续播放', false);
+    }
+  }
+
+  function finishBus() {
+    anim.playing = false;
+    if (anim.raf) cancelAnimationFrame(anim.raf);
+    anim.raf = null;
+    setPlayLabel('↺', '重播行程', false);
+    setTimeout(function () { callout.classList.remove('is-show'); }, 1800);
+  }
+
+  function tick(ts) {
+    if (!anim.playing) return;
+    if (!anim.lastTs) anim.lastTs = ts;
+    var dt = Math.min((ts - anim.lastTs) / 1000, 0.12);
+    anim.lastTs = ts;
+
+    if (anim.holdUntil) {
+      if (ts < anim.holdUntil) { anim.raf = requestAnimationFrame(tick); return; }
+      anim.holdUntil = 0;
+    }
+
+    var a = places[anim.seg], b = places[anim.seg + 1];
+    if (!a || !b) { finishBus(); return; }
+
+    anim.t += dt / SEG_SECONDS;
+    if (anim.t > 1) anim.t = 1;
+    setBusPos([
+      a.coords[0] + (b.coords[0] - a.coords[0]) * anim.t,
+      a.coords[1] + (b.coords[1] - a.coords[1]) * anim.t
+    ]);
+
+    if (anim.t >= 1) {
+      var arrive = anim.seg + 1;
+      if (anim.visited !== arrive) {
+        anim.visited = arrive;
+        setMarkerActive(arrive - 1, false);
+        setMarkerActive(arrive, true);
+        showCallout(arrive);
+      }
+      anim.holdUntil = ts + STOP_HOLD * 1000;
+      anim.seg++;
+      anim.t = 0;
+    }
+    anim.raf = requestAnimationFrame(tick);
+  }
+
+  function startBus() {
+    if (places.length < 2) return;
+    if (busMarker) { map.removeLayer(busMarker); busMarker = null; }
+    anim.seg = 0; anim.t = 0; anim.visited = -1; anim.holdUntil = 0; anim.lastTs = 0;
+    anim.playing = true;
+    map.fitBounds(L.latLngBounds(places.map(function (p) { return p.coords; })), {
+      paddingTopLeft: [70, 175], paddingBottomRight: [70, 155]
+    });
+    setBusPos(places[0].coords);
+    setTimeout(function () { showCallout(0); }, 260);
+    setPlayLabel('⏸', '暂停', true);
+    anim.raf = requestAnimationFrame(tick);
+  }
+
+  playBtn.addEventListener('click', function () {
+    if (anim.playing) { stopBus(false); return; }
+    if (anim.visited >= 0 && anim.seg >= places.length - 1) { startBus(); return; }  // 已跑完→重播
+    if (anim.seg > 0) {                       // 中途暂停→继续
+      anim.playing = true; anim.lastTs = 0;
+      setPlayLabel('⏸', '暂停', true);
+      anim.raf = requestAnimationFrame(tick);
+      return;
+    }
+    startBus();
+  });
 
   /* ========================= 启动 ========================= */
   var first = teams.findIndex(function (t) { return t.places.length; });
