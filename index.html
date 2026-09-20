@@ -61,6 +61,19 @@
     <div class="lightbox-cap" id="lightboxCap"></div>
   </div>
 
+  <!-- 坐标校准面板（在网址后面加 ?calibrate 才会出现） -->
+  <div class="calib" id="calib">
+    <div class="calib-head">
+      <strong>坐标校准模式</strong>
+      <div class="calib-tip">拖动地图上的标记到正确位置，坐标会自动更新</div>
+    </div>
+    <div class="calib-list" id="calibList"></div>
+    <div class="calib-foot">
+      <button id="calibCopy" type="button">复制全部坐标</button>
+      <button id="calibClose" type="button" class="ghost">退出</button>
+    </div>
+  </div>
+
   <script src="js/leaflet.js"></script>
   <script src="js/leaflet.markercluster.js"></script>
   <script src="data/places.js"></script>

@@ -8,6 +8,8 @@
 
   var SITE = window.SITE || { title: '三下乡路线图', subtitle: '' };
   var RAW = window.TEAMS;
+  // 网址后面加 ?calibrate 进入坐标校准模式
+  var CALIB = /[?&]calibrate/.test(location.search);
 
   /* ========================= 数据校验 ========================= */
   // 检查数据有没有写错，避免手滑导致整页白屏
@@ -253,6 +255,7 @@
       map.setView(places[0].coords, 13);
     }
 
+    if (CALIB) applyCalib();
     renderTimeline();
   }
 
@@ -608,6 +611,68 @@
   var first = teams.findIndex(function (t) { return t.places.length; });
   if (first === -1) first = 0;
   switchTeam(first);
+
+  /* ========================= 坐标校准模式（网址加 ?calibrate） ========================= */
+  var calibChanged = {};
+
+  function applyCalib() {
+    if (!CALIB) return;
+    var panel = document.getElementById('calib');
+    var list = document.getElementById('calibList');
+    if (!panel || !list) return;
+    panel.classList.add('is-show');
+
+    // 标记从聚合里取出来，直接放地图上，才能拖动
+    cluster.clearLayers();
+    markers.forEach(function (mk, i) {
+      mk.addTo(map);
+      if (mk.dragging) mk.dragging.enable();
+      mk.off('dragend.calib');
+      mk.on('dragend.calib', function () { calibChanged[i] = true; renderCalib(); });
+    });
+    renderCalib();
+
+    function renderCalib() {
+      list.innerHTML = '';
+      places.forEach(function (p, i) {
+        var c = markers[i].getLatLng();
+        var row = document.createElement('div');
+        row.className = 'calib-row' + (calibChanged[i] ? ' changed' : '');
+        row.innerHTML = '<div class="cr-name">' + (i + 1) + '. ' + esc(p.name) + '</div>' +
+          '<div class="cr-coord">[' + c.lat.toFixed(4) + ', ' + c.lng.toFixed(4) + ']</div>';
+        list.appendChild(row);
+      });
+    }
+  }
+
+  if (CALIB) {
+    (function () {
+      var copyBtn = document.getElementById('calibCopy');
+      var closeBtn = document.getElementById('calibClose');
+      if (copyBtn) copyBtn.addEventListener('click', function () {
+        var lines = ['# ' + teams[teamIndex].name + ' 校准后的坐标'];
+        places.forEach(function (p, i) {
+          var c = markers[i].getLatLng();
+          lines.push(p.name + '  [' + c.lat.toFixed(4) + ', ' + c.lng.toFixed(4) + ']');
+        });
+        var txt = lines.join('\n');
+        var ta = document.createElement('textarea');
+        ta.value = txt;
+        ta.style.cssText = 'position:fixed;left:-9999px';
+        document.body.appendChild(ta); ta.select();
+        var ok = false;
+        try { ok = document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(ta);
+        console.log(txt);
+        this.textContent = ok ? '✓ 已复制，发给我' : '已输出到控制台(F12)';
+        var b = this;
+        setTimeout(function () { b.textContent = '复制全部坐标'; }, 2400);
+      });
+      if (closeBtn) closeBtn.addEventListener('click', function () {
+        location.href = location.pathname;
+      });
+    })();
+  }
 
   // 只在窗口宽度明显变化（横竖屏切换）时重新适配，
   // 避免手机上滚动引起地址栏伸缩、反复重置地图
