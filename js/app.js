@@ -11,6 +11,11 @@
   // 网址后面加 ?calibrate 进入坐标校准模式
   var CALIB = /[?&]calibrate/.test(location.search);
 
+  // 播放行程时地图是否跟随放大/缩小。
+  // 默认关闭：整段行程画面固定在全景，只有大巴车在动（录屏用）。
+  // 想要以前那种"到一个地方就放大"的效果，网址后面加 ?zoom
+  var FOLLOW_ZOOM = /[?&]zoom/.test(location.search);
+
   /* ========================= 数据校验 ========================= */
   // 检查数据有没有写错，避免手滑导致整页白屏
   var MEDIA_TYPES = ['image', 'video', 'bilibili', 'tencent'];
@@ -463,12 +468,15 @@
   var busMarker = null;
   var callout = document.getElementById('routeCallout');
   var playBtn = document.getElementById('playBtn');
-  var SEG_SECONDS = 3.0;   // 每段行进时长（秒）——录视频时想快就调小
-  var STOP_HOLD = 4.2;     // 到站停留时长（秒，含放大动画）
-  var ZOOM_LEVEL = 13;     // 到站后放大到几级
-  var ZOOM_SECONDS = 0.9;  // 放大/缩小时长
+  var SEG_SECONDS = 3.0;      // ?zoom 模式下每段固定时长（秒）
+  var SPEED_KM_PER_SEC = 2.3; // 固定视角下按路程分配时长：路越远走得越久，快慢看起来一致
+  var SEG_MIN = 1.4;          // 单段最短时长（秒），避免短段像没动
+  var SEG_MAX = 7.0;          // 单段最长时长（秒），避免长段一闪而过
+  var STOP_HOLD = 4.2;     // 到站停留时长（秒）
+  var ZOOM_LEVEL = 13;     // ?zoom 模式下到站放大到几级
+  var ZOOM_SECONDS = 0.9;  // ?zoom 模式下放大/缩小时长
   var anim = { playing: false, seg: 0, t: 0, holdUntil: 0, lastTs: 0, raf: null, visited: -1 };
-  var routeBounds = null;  // 全程范围，用于缩回全览
+  var routeBounds = null;  // 全程范围，用于摆全景
 
   function zoomToPlace(i) {
     var p = places[i];
@@ -483,6 +491,39 @@
       paddingTopLeft: [70, 175],
       paddingBottomRight: [70, 155]
     });
+  }
+
+  // 两点的球面距离（公里）
+  function kmBetween(a, b) {
+    var R = 6371, rad = Math.PI / 180;
+    var dLat = (b[0] - a[0]) * rad, dLng = (b[1] - a[1]) * rad;
+    var s = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(a[0] * rad) * Math.cos(b[0] * rad) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
+  }
+
+  // 本段该走多久。全程约 90 公里里，最长一段 36 公里、最短一段 0.6 公里，
+  // 如果每段都固定 3 秒，长的会一闪而过、短的几乎看不出在动。
+  function segDuration(i) {
+    if (FOLLOW_ZOOM || !places[i] || !places[i + 1]) return SEG_SECONDS;
+    var t = kmBetween(places[i].coords, places[i + 1].coords) / SPEED_KM_PER_SEC;
+    return Math.max(SEG_MIN, Math.min(SEG_MAX, t));
+  }
+
+  // 固定视角下地图一直停在全景，这个缩放级别上聚合会把挨得近的点并成数字球，
+  // 车开过去也看不出是哪个点。所以播放期间把标记从聚合里取出来，直接铺在地图上。
+  function showPinsDirect() {
+    if (CALIB) return;              // 校准模式本来就是这样放的
+    cluster.clearLayers();
+    markers.forEach(function (mk) { if (!map.hasLayer(mk)) mk.addTo(map); });
+  }
+
+  function restoreCluster() {
+    if (CALIB) return;
+    var onMap = markers.filter(function (mk) { return map.hasLayer(mk); });
+    if (!onMap.length) return;      // 标记本来就在聚合里，不用动
+    onMap.forEach(function (mk) { map.removeLayer(mk); });
+    onMap.forEach(function (mk) { cluster.addLayer(mk); });
   }
 
   function busIcon() {
@@ -528,6 +569,7 @@
       setMarkerActive(current, false);
       setMarkerActive(anim.visited, false);
       anim.seg = 0; anim.t = 0; anim.visited = -1; anim.holdUntil = 0;
+      restoreCluster();
       setPlayLabel('▶', '播放行程', false);
     } else {
       setPlayLabel('▶', '继续播放', false);
@@ -551,13 +593,13 @@
     if (anim.holdUntil) {
       if (ts < anim.holdUntil) { anim.raf = requestAnimationFrame(tick); return; }
       anim.holdUntil = 0;
-      zoomToRoute();          // 停留结束，缩回全程视角
+      if (FOLLOW_ZOOM) zoomToRoute();   // ?zoom 模式：停留结束缩回全景
     }
 
     var a = places[anim.seg], b = places[anim.seg + 1];
     if (!a || !b) { finishBus(); return; }
 
-    anim.t += dt / SEG_SECONDS;
+    anim.t += dt / segDuration(anim.seg);
     if (anim.t > 1) anim.t = 1;
     setBusPos([
       a.coords[0] + (b.coords[0] - a.coords[0]) * anim.t,
@@ -571,7 +613,7 @@
         setMarkerActive(arrive - 1, false);
         setMarkerActive(arrive, true);
         showCallout(arrive);
-        zoomToPlace(arrive);        // 到站：自动放大到该地点
+        if (FOLLOW_ZOOM) zoomToPlace(arrive);   // 只有 ?zoom 模式才自动放大
       }
       anim.holdUntil = ts + STOP_HOLD * 1000;
       anim.seg++;
@@ -586,9 +628,13 @@
     anim.seg = 0; anim.t = 0; anim.visited = -1; anim.holdUntil = 0; anim.lastTs = 0;
     anim.playing = true;
     routeBounds = L.latLngBounds(places.map(function (p) { return p.coords; }));
+    // 开跑前一次性把全景摆好。固定视角模式下一瞬到位、之后地图不再动；
+    // ?zoom 模式保留原来的缩放进场。
     map.fitBounds(routeBounds, {
+      animate: FOLLOW_ZOOM,
       paddingTopLeft: [70, 175], paddingBottomRight: [70, 155]
     });
+    if (!FOLLOW_ZOOM) showPinsDirect();
     setBusPos(places[0].coords);
     setTimeout(function () { showCallout(0); }, 260);
     setPlayLabel('⏸', '暂停', true);
