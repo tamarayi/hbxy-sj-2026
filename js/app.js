@@ -198,6 +198,9 @@
     teamsNav.appendChild(btn);
   });
 
+  // 只有一支队伍时（如 huanwei.html）不显示切换标签，画面更干净
+  if (teams.length < 2) teamsNav.style.display = 'none';
+
   function paintTabs() {
     Array.prototype.forEach.call(teamsNav.children, function (el, i) {
       el.classList.toggle('is-active', i === teamIndex);

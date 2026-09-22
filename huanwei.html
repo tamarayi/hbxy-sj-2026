@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <title>以法治守护“两山”转化 · 环保卫士实践路线图</title>
+  <link rel="stylesheet" href="css/leaflet.css">
+  <link rel="stylesheet" href="css/MarkerCluster.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- 顶栏标题 -->
+  <header class="topbar">
+    <h1 id="siteTitle">三下乡路线图</h1>
+    <p id="siteSubtitle"></p>
+    <nav class="teams" id="teams"></nav>
+    <p class="site-note">说明：本图为实践路线示意，各点位标注的是大致范围，非精确地理定位，仅供展示参考。</p>
+    <button class="play-btn" id="playBtn" type="button">
+      <span class="pb-icon">▶</span><span class="pb-text">播放行程</span>
+    </button>
+  </header>
+
+  <!-- 大巴车行进时的地点提示卡 -->
+  <div class="route-callout" id="routeCallout">
+    <span class="rc-num" id="rcNum">1</span>
+    <div class="rc-text">
+      <strong id="rcName"></strong>
+      <span id="rcDesc"></span>
+    </div>
+  </div>
+
+  <!-- 数据出错时的提示条 -->
+  <div class="errbar" id="errbar"></div>
+
+  <!-- 地图 -->
+  <div id="map"></div>
+
+  <!-- 遮罩（手机端点开详情时用） -->
+  <div class="scrim" id="scrim"></div>
+
+  <!-- 底部路线时间轴 -->
+  <nav class="timeline" id="timeline"></nav>
+
+  <!-- 地点详情面板 -->
+  <aside class="panel" id="panel">
+    <div class="panel-head">
+      <h2 id="panelTitle"></h2>
+      <span class="panel-date" id="panelDate"></span>
+      <button class="panel-close" id="panelClose" aria-label="关闭">×</button>
+    </div>
+    <div class="panel-body" id="panelBody">
+      <div class="panel-intro" id="panelIntro"></div>
+      <div id="panelMedia"></div>
+    </div>
+  </aside>
+
+  <!-- 图片放大查看 -->
+  <div class="lightbox" id="lightbox">
+    <img id="lightboxImg" alt="">
+    <div class="lightbox-cap" id="lightboxCap"></div>
+  </div>
+
+  <!-- 坐标校准面板（在网址后面加 ?calibrate 才会出现） -->
+  <div class="calib" id="calib">
+    <div class="calib-head">
+      <strong>坐标校准模式</strong>
+      <div class="calib-tip">拖动地图上的标记到正确位置，坐标会自动更新</div>
+    </div>
+    <div class="calib-list" id="calibList"></div>
+    <div class="calib-foot">
+      <div class="calib-out-tip">① 点下面的框 ② 按 Ctrl+A ③ 按 Ctrl+C ④ 发给我</div>
+      <textarea id="calibOut" readonly spellcheck="false"></textarea>
+      <div class="calib-btns">
+        <button id="calibCopy" type="button">一键复制</button>
+        <button id="calibClose" type="button" class="ghost">退出</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/leaflet.js"></script>
+  <script src="js/leaflet.markercluster.js"></script>
+  <script src="data/places-huanwei.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
